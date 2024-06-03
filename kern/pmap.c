@@ -8,6 +8,7 @@
 
 #include <kern/pmap.h>
 #include <kern/kclock.h>
+#include <stdint.h>
 
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
@@ -102,8 +103,21 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
+  if(n == 0) {
+    return nextfree;
+  }
 
-	return NULL;
+  // adding next space
+  result = nextfree;
+
+  // getting size that we need to add
+  uint32_t boot_size = ROUNDUP(n, PGSIZE);
+
+  // adding new size to nextfree
+  nextfree += boot_size;
+
+  // returning result
+	return result;
 }
 
 // Set up a two-level page table:
@@ -124,12 +138,14 @@ mem_init(void)
 	// Find out how much memory the machine has (npages & npages_basemem).
 	i386_detect_memory();
 
-	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
+
+	// Remove this line when you're ready to test this function.
+	panic("mem_init: This function is not finished\n");
+
 	memset(kern_pgdir, 0, PGSIZE);
 
 	//////////////////////////////////////////////////////////////////////
@@ -158,6 +174,7 @@ mem_init(void)
 	// or page_insert
 	page_init();
 
+  // till here
 	check_page_free_list(1);
 	check_page_alloc();
 	check_page();
