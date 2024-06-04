@@ -8,7 +8,6 @@
 
 #include <kern/pmap.h>
 #include <kern/kclock.h>
-#include <stdint.h>
 
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
@@ -144,7 +143,6 @@ mem_init(void)
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
 
 	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
 
 	memset(kern_pgdir, 0, PGSIZE);
 
@@ -164,7 +162,10 @@ mem_init(void)
 	// array.  'npages' is the number of physical pages in memory.  Use memset
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
-
+  //
+  size_t to_alloc = npages * sizeof(struct PageInfo);
+  pages = (struct PageInfo*) boot_alloc(to_alloc);
+  memset(pages, 0, to_alloc);
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -174,7 +175,6 @@ mem_init(void)
 	// or page_insert
 	page_init();
 
-  // till here
 	check_page_free_list(1);
 	check_page_alloc();
 	check_page();
@@ -268,8 +268,38 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
+  const int zero_frame_index = 0;
+  const int io_pmemstartframe = IOPHYSMEM >> PGSHIFT;
+  const int io_pmemendframe = EXTPHYSMEM >> PGSHIFT;
+
+  extern char end[];
+
+  const int kphymemstart = 0x100000;
+  const void* kphymemend = ROUNDUP((char*) end, PGSIZE);
+
+  const int k_pmemstartframe = kphymemstart >> PGSHIFT;
+  const int k_pmemendframe = (uintptr_t)kphymemend >> PGSHIFT;
+
+  const void* k_bootallocend = boot_alloc(0);
+  const int k_bootallocstartframe = (uintptr_t)kphymemend >> PGSHIFT;
+  const int k_bootallocendframe = (uintptr_t)k_bootallocend >> PGSHIFT;
+
+
 	size_t i;
 	for (i = 0; i < npages; i++) {
+    if(i == zero_frame_index) {
+      continue;
+    }
+    if (i < io_pmemendframe || i >= io_pmemstartframe ) {
+      continue;
+    }
+    if (i < k_pmemendframe || i >= k_pmemstartframe ) {
+      continue;
+    }
+    if (i < k_bootallocendframe || i >= k_bootallocstartframe ) {
+      continue;
+    }
+
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
