@@ -142,8 +142,6 @@ mem_init(void)
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
 
-	// Remove this line when you're ready to test this function.
-
 	memset(kern_pgdir, 0, PGSIZE);
 
 	//////////////////////////////////////////////////////////////////////
@@ -174,7 +172,6 @@ mem_init(void)
 	// particular, we can now map memory using boot_map_region
 	// or page_insert
 	page_init();
-  cprintf("page init done");
 
 	check_page_free_list(1);
 	check_page_alloc();
@@ -282,7 +279,7 @@ page_init(void)
   const int k_pmemendframe = ((uintptr_t)kphymemend - KERNBASE) >> PGSHIFT;
 
   const void* k_bootallocend = boot_alloc(0);
-  const int k_bootallocstartframe = (uintptr_t)kphymemend >> PGSHIFT;
+  const int k_bootallocstartframe = k_pmemendframe;
   const int k_bootallocendframe = ((uintptr_t)k_bootallocend - KERNBASE) >> PGSHIFT;
 
   cprintf("running\n");
@@ -292,13 +289,13 @@ page_init(void)
     if(i == zero_frame_index) {
       continue;
     }
-    if (i < io_pmemendframe && i >= io_pmemstartframe ) {
+    if (i >= io_pmemstartframe && i < io_pmemendframe ) {
       continue;
     }
-    if (i < k_pmemendframe && i >= k_pmemstartframe ) {
+    if (i >= k_pmemstartframe && i < k_pmemendframe ) {
       continue;
     }
-    if (i < k_bootallocendframe && i >= k_bootallocstartframe ) {
+    if (i >= k_bootallocstartframe && i < k_bootallocendframe ) {
       continue;
     }
 
@@ -539,7 +536,6 @@ check_page_free_list(bool only_low_memory)
 		if (PDX(page2pa(pp)) < pdx_limit)
 			memset(page2kva(pp), 0x97, 128);
 
-  cprintf("in side if");
 	first_free_page = (char *) boot_alloc(0);
 	for (pp = page_free_list; pp; pp = pp->pp_link) {
 		// check that we didn't corrupt the free list itself
