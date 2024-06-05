@@ -174,6 +174,7 @@ mem_init(void)
 	// particular, we can now map memory using boot_map_region
 	// or page_insert
 	page_init();
+  cprintf("page init done");
 
 	check_page_free_list(1);
 	check_page_alloc();
@@ -278,25 +279,26 @@ page_init(void)
   const void* kphymemend = ROUNDUP((char*) end, PGSIZE);
 
   const int k_pmemstartframe = kphymemstart >> PGSHIFT;
-  const int k_pmemendframe = (uintptr_t)kphymemend >> PGSHIFT;
+  const int k_pmemendframe = ((uintptr_t)kphymemend - KERNBASE) >> PGSHIFT;
 
   const void* k_bootallocend = boot_alloc(0);
   const int k_bootallocstartframe = (uintptr_t)kphymemend >> PGSHIFT;
-  const int k_bootallocendframe = (uintptr_t)k_bootallocend >> PGSHIFT;
+  const int k_bootallocendframe = ((uintptr_t)k_bootallocend - KERNBASE) >> PGSHIFT;
 
+  cprintf("running\n");
 
 	size_t i;
 	for (i = 0; i < npages; i++) {
     if(i == zero_frame_index) {
       continue;
     }
-    if (i < io_pmemendframe || i >= io_pmemstartframe ) {
+    if (i < io_pmemendframe && i >= io_pmemstartframe ) {
       continue;
     }
-    if (i < k_pmemendframe || i >= k_pmemstartframe ) {
+    if (i < k_pmemendframe && i >= k_pmemstartframe ) {
       continue;
     }
-    if (i < k_bootallocendframe || i >= k_bootallocstartframe ) {
+    if (i < k_bootallocendframe && i >= k_bootallocstartframe ) {
       continue;
     }
 
@@ -321,8 +323,23 @@ page_init(void)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
+
+  if(page_free_list == NULL) {
+    return NULL;
+  }
+
+  struct PageInfo* free_page = page_free_list;
+  page_free_list = free_page->pp_link;
+  free_page->pp_link = NULL;
+
+
+  if(alloc_flags & ALLOC_ZERO) {
+    void* free_page_va = page2kva(free_page);
+    memset(free_page_va, 0, PGSIZE);
+
+  }
 	// Fill this function in
-	return 0;
+  return free_page;
 }
 
 //
@@ -335,6 +352,11 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+  if(pp->pp_ref || pp->pp_link) {
+    panic("pp_ref or pp_link is non zero");
+  }
+  pp->pp_link = page_free_list;
+  page_free_list = pp;
 }
 
 //
@@ -496,6 +518,7 @@ check_page_free_list(bool only_low_memory)
 	if (!page_free_list)
 		panic("'page_free_list' is a null pointer!");
 
+
 	if (only_low_memory) {
 		// Move pages with lower addresses first in the free
 		// list, since entry_pgdir does not map all pages.
@@ -510,13 +533,13 @@ check_page_free_list(bool only_low_memory)
 		*tp[0] = pp2;
 		page_free_list = pp1;
 	}
-
 	// if there's a page that shouldn't be on the free list,
 	// try to make sure it eventually causes trouble.
 	for (pp = page_free_list; pp; pp = pp->pp_link)
 		if (PDX(page2pa(pp)) < pdx_limit)
 			memset(page2kva(pp), 0x97, 128);
 
+  cprintf("in side if");
 	first_free_page = (char *) boot_alloc(0);
 	for (pp = page_free_list; pp; pp = pp->pp_link) {
 		// check that we didn't corrupt the free list itself
@@ -539,6 +562,7 @@ check_page_free_list(bool only_low_memory)
 
 	assert(nfree_basemem > 0);
 	assert(nfree_extmem > 0);
+  cprintf("before last cprintf");
 
 	cprintf("check_page_free_list() succeeded!\n");
 }
