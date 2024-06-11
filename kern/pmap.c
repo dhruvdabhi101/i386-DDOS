@@ -407,20 +407,23 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
       return ret;
     }
 
+    cprintf("line no: 411: pgdirwalk");
     struct PageInfo* new_page = page_alloc(ALLOC_ZERO);
     if(new_page == NULL) {
       return ret;
     }
 
     new_page -> pp_ref++;
+
     physaddr_t new_page_pa = page2pa(new_page);
-    pde_t page_dir_entry_copy = *page_dir_entry;
     assert((new_page_pa & 0xFFF) == 0);
 
+
+    *page_dir_entry = 0;
+    pde_t page_dir_entry_copy = *page_dir_entry;
     page_dir_entry_copy |= new_page_pa;
 
     *page_dir_entry = page_dir_entry_copy;
-
     pte_t* new_page_table_va = page2kva(new_page);
     pte_t* page_table_entry = new_page_table_va + page_table_idx;
 
@@ -428,6 +431,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 
   } else {
 
+    cprintf("line no: 434: pgdirwalk");
     pte_t* page_table_va = (pte_t*) KADDR(page_table_pa);
     pte_t* page_table_entry = page_table_va + page_table_idx;
     ret = page_table_entry;
@@ -497,7 +501,38 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-	// Fill this function in
+  // get physical address of the page
+  const physaddr_t pa = page2pa(pp);
+
+  struct PageInfo* page_info = page_lookup(pgdir, va, NULL);
+  if(page_info == NULL) {
+    // go and assign the physical address to virtual address => Happy
+    pte_t* pte_p = pgdir_walk(pgdir, (void *)va, true);
+
+    if(pte_p == NULL) {
+      return -E_NO_MEM;
+    }
+
+    *pte_p = 0;
+    *pte_p |= pa;
+    *pte_p |= (perm | PTE_P);
+
+  } else {
+    pte_t* pte_p = pgdir_walk(pgdir, (void *)va, false);
+    if(pte_p == NULL) {
+      return -E_NO_MEM;
+    }
+
+    *pte_p = 0;
+    *pte_p |= pa;
+    *pte_p |= (perm | PTE_P);
+    int is_same_pp = (page_info == pp);
+    if(!is_same_pp) {
+      page_remove(pgdir, va);
+    }
+    tlb_invalidate(pgdir, va);
+  }
+
 	return 0;
 }
 
@@ -516,7 +551,7 @@ struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	// Fill this function in
-  pte_t* pte_p = pgdir_walk(pgdir,(void *)va, true)
+  pte_t* pte_p = pgdir_walk(pgdir,(void *)va, true);
   if(pte_p == NULL) return NULL;
 
   if(pte_store != NULL) {
@@ -552,7 +587,7 @@ page_remove(pde_t *pgdir, void *va)
 {
   pte_t* pte = NULL;
 
-  struct pageInfo* page_info = page_lookup(pgdir, va, &pte);
+  struct PageInfo* page_info = page_lookup(pgdir, va, &pte);
   if(page_info == NULL) {
     return;
   }
