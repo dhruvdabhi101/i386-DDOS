@@ -196,6 +196,10 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
+  //
+  // Hint:
+  // from lab1 we know that the kernel stack is at 0xf0108000-0xf0110000, we now map it to [KSTACKTOP-KSTKSIZE, KSTACKTOP) where KSTKSIZE is 8 * PGSIZE, which is exactly 0x8000.
+
   boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
@@ -206,6 +210,10 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+  //
+  // Hint:
+  // Map all of physical memory at KERNBASE
+  // the VA range [KERNBASE, 2^32) should map to the PA range [0, 2^32 - KERNBASE)
   boot_map_region(kern_pgdir, KERNBASE, -KERNBASE, 0, PTE_W);
 
 
