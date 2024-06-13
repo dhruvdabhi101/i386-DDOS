@@ -41,6 +41,11 @@
 // construct linear address from indexes and offset
 #define PGADDR(d, t, o)	((void*) ((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
 
+// EXTRAS
+#define PGDIR_INDEX(la) (((uintptr_t)la >> 22))
+#define PGTABLE_INDEX(la) (((uintptr_t)la >> 12) & 0x3FF)
+#define PG_OFFSET(la) (la & 0xFFF)
+
 // Page directory and page table constants.
 #define NPDENTRIES	1024		// page directory entries per page directory
 #define NPTENTRIES	1024		// page table entries per page table
