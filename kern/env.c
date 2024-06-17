@@ -24,7 +24,7 @@ static struct Env *env_free_list;	// Free environment list
 // Set up global descriptor table (GDT) with separate segments for
 // kernel mode and user mode.  Segments serve many purposes on the x86.
 // We don't use any of their memory-mapping capabilities, but we need
-// them to switch privilege levels. 
+// them to switch privilege levels.
 //
 // The kernel and user segments are identical except for the DPL.
 // To load the SS register, the CPL must equal the DPL.  Thus,
@@ -116,6 +116,13 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+  env_free_list = NULL;
+  for(int i = NENV - 1; i >= 0; i--) {
+    envs[i].env_status = ENV_FREE;
+    envs[i].env_id = 0;
+    envs[i].env_link = env_free_list;
+    env_free_list = &envs[i];
+  }
 
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -177,8 +184,17 @@ env_setup_vm(struct Env *e)
 	//	is an exception -- you need to increment env_pgdir's
 	//	pp_ref for env_free to work correctly.
 	//    - The functions in kern/pmap.h are handy.
-
 	// LAB 3: Your code here.
+  // We got total number of env page tables from 0 -> UTOP, and as said, we need to make them empty, so made them 0
+  // now after UTOP to UPAGES, that means we need to get the number of pages between UTOP to UPAGES btw UPAGES - UTOP = PTSIZE, so we figured we need to find the UTOP / PTSIZE -> 1024
+  e->env_pgdir = (pde_t *)(page2kva(p));
+  for(int i = 0; i < UTOP / PTSIZE; ++i) {
+    e->env_pgdir[i] = 0;
+  }
+  for(int i = UTOP / PTSIZE; i < 1024; ++i) {
+    e->env_pgdir[i] = kern_pgdir[i];
+  }
+  p->pp_ref++;
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
