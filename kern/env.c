@@ -123,7 +123,6 @@ env_init(void)
     envs[i].env_link = env_free_list;
     env_free_list = &envs[i];
   }
-
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -284,16 +283,16 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
   void* start = (void *)ROUNDDOWN((uint32_t) va, PGSIZE);
-  void* end = (void *)ROUNDDOWN((uint32_t) va + len, PGSIZE);
+  void* end = (void *)ROUNDUP((uint32_t) va + len, PGSIZE);
   void* i;
   int r;
   for(i = start; i < end; i+=PGSIZE) {
-    struct PageInfo* p = page_alloc(0);
+    struct PageInfo* p = page_alloc(0); // not initialised
     if(p == NULL) {
       panic("region_alloc: allocation failed\n");
     }
     r = page_insert(e->env_pgdir, p, i, PTE_U | PTE_W);
-    if(!r) {
+    if(r != 0) {
       panic("region_alloc: %e\n", r);
     }
   }
@@ -353,8 +352,16 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
+  if(e == NULL || binary == NULL)
+      panic("load_icode: invalid env or binary\n");
+
 
   struct Elf * ElfHeader = (struct Elf *)binary;
+  if(ElfHeader->e_magic != ELF_MAGIC)
+  {
+    panic("load_icode: invalid elf format\n");
+  }
+
   struct Proghdr * ph = (struct Proghdr *) ((uint8_t *) ElfHeader + ElfHeader->e_phoff);
   struct Proghdr * eph = ph + ElfHeader->e_phnum;
 
@@ -368,15 +375,15 @@ load_icode(struct Env *e, uint8_t *binary)
       memmove((void*)ph->p_va, (uint8_t *)binary + ph->p_offset, ph->p_filesz);
       memset((void *)ph->p_va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
     }
-
   }
-
+  lcr3(PADDR(kern_pgdir));
+  e->env_tf.tf_eip = ElfHeader->e_entry;
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
-  region_alloc(e, (void *)USTACKTOP - PGSIZE, PGSIZE);
+  region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
 }
 
 //
@@ -392,7 +399,7 @@ env_create(uint8_t *binary, enum EnvType type)
 	// LAB 3: Your code here.
   struct Env* env = NULL;
   int r = env_alloc(&env, 0);
-  if(!r) {
+  if(r != 0) {
     panic("env create: %e", r);
   }
   load_icode(env, binary);
@@ -528,9 +535,6 @@ env_run(struct Env *e)
   curenv->env_runs++;
   lcr3(PADDR(curenv->env_pgdir));
   env_pop_tf(&(curenv->env_tf));
-
-
-
-
+  panic("env_run not yet implemented");
 }
 
