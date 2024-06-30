@@ -366,9 +366,10 @@ load_icode(struct Env *e, uint8_t *binary)
   struct Proghdr * eph = ph + ElfHeader->e_phnum;
 
   lcr3(PADDR(e->env_pgdir));
+  cprintf("we messedup here \n");
   for(; ph < eph; ph++) {
     if(ph->p_type == ELF_PROG_LOAD) {
-      if(ph->p_filesz > ph->p_memsz) {
+      if(ph->p_memsz < ph->p_filesz) {
         panic("load_icode: p_memsz < p_filesz\n");
       }
       region_alloc(e,(void *)ph->p_va, ph->p_memsz);
@@ -535,6 +536,7 @@ env_run(struct Env *e)
   curenv->env_runs++;
   lcr3(PADDR(curenv->env_pgdir));
   env_pop_tf(&(curenv->env_tf));
-  panic("env_run not yet implemented");
+
+  panic("not implemented yet");
 }
 
